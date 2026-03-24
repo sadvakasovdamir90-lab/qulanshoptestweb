@@ -141,7 +141,7 @@
         <div id="recaptcha-container"></div>
     </div>
 
- <script type="module">
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
@@ -211,15 +211,16 @@
             })
             .catch((error) => {
                 console.error("Firebase Error:", error);
+                // ОСЫ ЖЕРДЕГІ ӨЗГЕРІС: Енді қате болса да, код сұрайтын бетке ('verify') жібереді
                 Swal.fire({
                     title: 'СМС жіберілмеді',
-                    text: 'Локальді режимде жалғастырамыз ба?',
+                    text: 'Локальді режимде кодты қолмен енгізу арқылы жалғастырамыз ба?',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonText: 'Иә'
                 }).then((res) => {
                     if (res.isConfirmed) {
-                        window.switchMode('new-pass');
+                        window.switchMode('verify'); 
                     }
                 });
             });
@@ -227,13 +228,21 @@
 
     window.confirmCode = function() {
         const code = document.getElementById('verify-code').value;
-        window.confirmationResult.confirm(code)
-            .then(() => {
-                Swal.fire('Успешно!', 'Номер подтвержден ✅', 'success');
-                window.switchMode('new-pass');
-            }).catch(() => {
-                Swal.fire('Ошибка', 'Неверный код.', 'error');
-            });
+        
+        // ТЕК ТЕКСЕРУ: Егер Firebase істеп тұрса, нақты кодты тексереді
+        if (window.confirmationResult) {
+            window.confirmationResult.confirm(code)
+                .then(() => {
+                    Swal.fire('Успешно!', 'Номер подтвержден ✅', 'success');
+                    window.switchMode('new-pass');
+                }).catch(() => {
+                    Swal.fire('Ошибка', 'Неверный код.', 'error');
+                });
+        } else {
+            // Егер СМС келмеген болса, бірақ сен кодты жазсаң, бәрібір өткізеді (локальді режим үшін)
+            Swal.fire('Локальді режим', 'Код қабылданды ✅', 'info');
+            window.switchMode('new-pass');
+        }
     };
 
     window.completeProcess = function() {
@@ -262,7 +271,6 @@
         }
 
         localStorage.setItem('isLoggedIn', 'true');
-        // ТӨМЕНДЕГІ ЖОЛ ҚОСЫЛДЫ (24 сағаттық тексеріс үшін)
         localStorage.setItem('lastAuthTime', new Date().getTime()); 
         window.location.href = 'profile.html';
     };
@@ -278,7 +286,6 @@
         if (user) {
             localStorage.setItem('isLoggedIn', 'true');
             localStorage.setItem('currentUserId', user.id);
-            // ТӨМЕНДЕГІ ЖОЛ ҚОСЫЛДЫ (24 сағаттық тексеріс үшін)
             localStorage.setItem('lastAuthTime', new Date().getTime()); 
             
             const redirectUrl = localStorage.getItem('redirectTarget') || 'profile.html';
