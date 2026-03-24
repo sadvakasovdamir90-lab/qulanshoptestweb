@@ -166,13 +166,10 @@
         }
     };
 
-  // Кодыңдағы reCAPTCHA бөлігін мынаған ауыстыр:
-window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 
-    'size': 'invisible', // ЕНДІ КӨРІНБЕЙТІН БОЛАДЫ
-    'callback': (response) => {
-        // reCAPTCHA сәтті өткенде орындалады
-    }
-});
+    // ReCAPTCHA: Көрінбейтін режим (дизайнды бұзбайды)
+    window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 
+        'size': 'invisible' 
+    });
 
     window.switchMode = function(mode) {
         const sections = ['login-section', 'reg-section', 'forgot-section', 'verify-section', 'new-pass-section'];
@@ -189,6 +186,7 @@ window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         if (mode === 'forgot' || mode === 'verify') subtitle.innerText = "Восстановление доступа";
     };
 
+    // СМС ЖІБЕРУ (Тіркелу және Пароль ұмытқанда)
     window.startPhoneAuth = function(mode) {
         window.currentProcess = mode;
         const phoneId = (mode === 'reg') ? 'reg-phone' : 'forgot-phone';
@@ -203,9 +201,11 @@ window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
         if (mode === 'reg') {
             const nameVal = document.getElementById('reg-name').value;
             window.tempUser = { name: nameVal, phone: phoneNumber };
+        } else {
+            // Пароль ұмытқанда нөмірді сақтап қою
+            window.tempUser = { phone: phoneNumber };
         }
 
-        // БҰЛ ЖЕРДЕ FIREBASE СМС ЖІБЕРУІ ҚАЛАДЫ
         signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier)
             .then((result) => {
                 window.confirmationResult = result;
@@ -214,13 +214,13 @@ window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
             })
             .catch((error) => {
                 console.error("Firebase Error:", error);
-                // ЕГЕР ҚАТЕ ШЫҚСА (МЫСАЛЫ ДОМЕН ҚАТЕСІ), БІЗ БӘРІБІР КЕЛЕСІ ҚАДАМҒА ӨТКІЗЕМІЗ:
+                // Егер GitHub-та домен қатесі шықса, бәрібір жалғастыру мүмкіндігі (сенің сұрауың бойынша)
                 Swal.fire({
-                    title: 'Домен қатесі (Локальді режим)',
-                    text: 'Firebase СМС жібере алмады, бірақ тіркелуді жалғастырамыз ба?',
+                    title: 'СМС жіберілмеді',
+                    text: 'Локальді режимде жалғастырамыз ба?',
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'Иә, жалғастыру'
+                    confirmButtonText: 'Иә'
                 }).then((res) => {
                     if (res.isConfirmed) {
                         window.switchMode('new-pass');
@@ -256,27 +256,43 @@ window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
             users.push(newUser);
             localStorage.setItem('users', JSON.stringify(users));
             localStorage.setItem('currentUserId', newUser.id);
+        } else if (window.currentProcess === 'forgot') {
+            // Парольді жаңарту логикасы
+            const userIdx = users.findIndex(u => u.phone === window.tempUser.phone);
+            if (userIdx !== -1) {
+                users[userIdx].password = p1;
+                localStorage.setItem('users', JSON.stringify(users));
+                localStorage.setItem('currentUserId', users[userIdx].id);
+            }
         }
 
         localStorage.setItem('isLoggedIn', 'true');
         window.location.href = 'profile.html';
     };
 
+    // ВОЙТИ БАТЫРМАСЫ: Нақты жұмыс істейтін нұсқа
     window.handleLogin = function() {
         const rawPhone = document.getElementById('login-phone').value;
         const phone = rawPhone.replace(/\s+/g, '');
         const pass = document.getElementById('login-pass').value;
+        
         let users = JSON.parse(localStorage.getItem('users')) || [];
+        
+        // Пайдаланушыны нөмірі мен паролі бойынша іздеу
         const user = users.find(u => u.phone === phone && u.password === pass);
 
-        if (user) {
-            localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('currentUserId', user.id);
-            window.location.href = 'profile.html';
-        } else {
-            Swal.fire('Ошибка', 'Неверный номер или пароль!', 'warning');
-        }
-    };
+   // handleLogin функциясының ішінде (user табылған жерде):
+    if (user) {
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('currentUserId', user.id);
+    localStorage.setItem('lastAuthTime', new Date().getTime()); // ҚАЗІРГІ УАҚЫТТЫ САҚТАУ
+    // ... қалған код
+}
+
+// completeProcess функциясының соңында:
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('lastAuthTime', new Date().getTime()); // ҚАЗІРГІ УАҚЫТТЫ САҚТАУ
+    window.location.href = 'profile.html';
     
     window.togglePass = function(id, btn) {
         const el = document.getElementById(id);
